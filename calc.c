@@ -1,6 +1,7 @@
 #include <gtk/gtk.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 
 #define ERROR_INVALID_INPUT 1
 
@@ -11,6 +12,7 @@ typedef struct
     double *nums;
     int *nums_index;
     int *str_index;
+    bool *has_decimal_point;
 } ButtonData;
 
 typedef struct
@@ -18,22 +20,8 @@ typedef struct
     double *nums;
     int *nums_index;
     int *str_index;
+    bool *has_decimal_point;
 } DynamicData;
-
-int countDigits(int num)
-{
-    if (num == 0)
-        return 1; // Special case for 0
-    int count = 0;
-    if (num < 0)
-        num = -num; // Handle negative numbers
-    while (num > 0)
-    {
-        num /= 10;
-        count++;
-    }
-    return count;
-}
 
 void slice_string(const char *str, int start, int end, char *result)
 {
@@ -194,6 +182,7 @@ static void on_button_clicked(GtkWidget *widget, gpointer data)
     double *nums = button_data->nums;
     int *nums_index = button_data->nums_index;
     int *str_index = button_data->str_index;
+    bool *has_decimal_point = button_data->has_decimal_point;
 
     g_print("Button %s clicked\n", button_label);
 
@@ -204,6 +193,7 @@ static void on_button_clicked(GtkWidget *widget, gpointer data)
     if (button_label == "C")
     {
         gtk_label_set_text(display, "0");
+        *has_decimal_point = false;
         nums[0] = 0;
         *nums_index = 0;
         *str_index = 0;
@@ -218,20 +208,29 @@ static void on_button_clicked(GtkWidget *widget, gpointer data)
         }
         else
         {
+            char *result;
+            sprintf(result, "%.15g", nums[*nums_index - 1]);
             slice_string(current_text, 0, *str_index - 1, display_text);
-            *str_index = strlen(display_text) - countDigits(nums[*nums_index - 1]);
+            *str_index = strlen(display_text) - strlen(result);
             *nums_index -= 1;
             nums[*nums_index] = 0;
+        }
+        if (display_text[0] == '\0')
+        {
+            display_text[0] = '0';
+            display_text[1] = '\0';
         }
         gtk_label_set_text(display, display_text);
         return;
     }
     else if (strcmp(current_text, "Error") == 0)
     {
+        *has_decimal_point = false;
         return;
     }
     else if (button_label == "*" || button_label == "/" || button_label == "+" || button_label == "-")
     {
+        *has_decimal_point = false;
         if (save_new_number(current_text, str_index, nums, nums_index) == ERROR_INVALID_INPUT)
         {
             return;
@@ -239,8 +238,17 @@ static void on_button_clicked(GtkWidget *widget, gpointer data)
     }
     else if (button_label == "=")
     {
+        *has_decimal_point = false;
         process_equation(current_text, str_index, nums, nums_index, display);
         return;
+    }
+    else if (button_label == ".")
+    {
+        if (*has_decimal_point)
+        {
+            return;
+        }
+        *has_decimal_point = true;
     }
     else
     {
@@ -268,24 +276,25 @@ static void on_button_clicked(GtkWidget *widget, gpointer data)
     g_print("Display: %s\n", display_text);
 }
 
-static void create_button_data(GtkWidget *button, ButtonData *button_data, const char *button_label, GtkLabel *display, double *nums, int *nums_index, int *str_index)
+static void create_button_data(GtkWidget *button, ButtonData *button_data, const char *button_label, GtkLabel *display, double *nums, int *nums_index, int *str_index, bool *has_decimal_point)
 {
     button_data->button_label = button_label;
     button_data->display = display;
     button_data->nums = nums;
     button_data->nums_index = nums_index;
     button_data->str_index = str_index;
+    button_data->has_decimal_point = has_decimal_point;
 
     g_object_set_data(G_OBJECT(button), "button_data", button_data);
 }
 
-static GtkWidget *create_button(char *label, GtkLabel *display, double *nums, int *nums_index, int *str_index)
+static GtkWidget *create_button(char *label, GtkLabel *display, double *nums, int *nums_index, int *str_index, bool *has_decimal_point)
 {
     GtkWidget *button = gtk_button_new_with_label(label);
 
     ButtonData *button_data = g_new(ButtonData, 1);
 
-    create_button_data(button, button_data, label, display, nums, nums_index, str_index);
+    create_button_data(button, button_data, label, display, nums, nums_index, str_index, has_decimal_point);
 
     g_signal_connect(button, "clicked", G_CALLBACK(on_button_clicked), button_data);
     return button;
@@ -297,10 +306,12 @@ static void on_window_destroy(GtkWidget *widget, gpointer data)
     double *nums = data_pointers->nums;
     int *nums_index = data_pointers->nums_index;
     int *str_index = data_pointers->str_index;
+    bool *has_decimal_point = data_pointers->has_decimal_point;
 
     g_free(nums);
     g_free(nums_index);
     g_free(str_index);
+    g_free(has_decimal_point);
 
     g_print("Memory freed.\n");
 }
@@ -327,18 +338,20 @@ activate(GtkApplication *app,
     double *nums = g_new(double, 100);
     int *nums_index = g_new(int, 1);
     int *str_index = g_new(int, 1);
+    bool *has_decimal_point = g_new(bool, 1);
     *nums_index = 0;
     *str_index = 0;
+    *has_decimal_point = false;
 
-    GtkWidget *clear_button = create_button("C", GTK_LABEL(display), nums, nums_index, str_index);
+    GtkWidget *clear_button = create_button("C", GTK_LABEL(display), nums, nums_index, str_index, has_decimal_point);
     gtk_grid_attach(GTK_GRID(grid), clear_button, 0, 1, 1, 1);
 
-    GtkWidget *clear_one_button = create_button("CE", GTK_LABEL(display), nums, nums_index, str_index);
+    GtkWidget *clear_one_button = create_button("CE", GTK_LABEL(display), nums, nums_index, str_index, has_decimal_point);
     gtk_grid_attach(GTK_GRID(grid), clear_one_button, 3, 1, 1, 1);
 
     for (int i = 0; i < 16; i++)
     {
-        GtkWidget *button = create_button(buttons[i], GTK_LABEL(display), nums, nums_index, str_index);
+        GtkWidget *button = create_button(buttons[i], GTK_LABEL(display), nums, nums_index, str_index, has_decimal_point);
 
         gtk_grid_attach(GTK_GRID(grid), button, i % 4, (i + 8) / 4, 1, 1);
     }
@@ -349,7 +362,7 @@ activate(GtkApplication *app,
     // screen = gdk_display_get_default_screen(display);
     // gtk_style_context_add_provider_for_screen(screen, GTK_STYLE_PROVIDER(css_provider), GTK_STYLE_PROVIDER_PRIORITY_USER);
 
-    DynamicData data_pointers = {nums, nums_index, str_index};
+    DynamicData data_pointers = {nums, nums_index, str_index, has_decimal_point};
     g_signal_connect(window, "destroy", G_CALLBACK(on_window_destroy), &data_pointers);
 
     gtk_window_present(GTK_WINDOW(window));
