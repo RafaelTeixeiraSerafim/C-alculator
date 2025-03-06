@@ -20,6 +20,21 @@ typedef struct
     int *str_index;
 } DynamicData;
 
+int countDigits(int num)
+{
+    if (num == 0)
+        return 1; // Special case for 0
+    int count = 0;
+    if (num < 0)
+        num = -num; // Handle negative numbers
+    while (num > 0)
+    {
+        num /= 10;
+        count++;
+    }
+    return count;
+}
+
 void slice_string(const char *str, int start, int end, char *result)
 {
     if (start < 0 || end < start || end > strlen(str))
@@ -186,7 +201,7 @@ static void on_button_clicked(GtkWidget *widget, gpointer data)
     char display_text[100];
     bool is_cur_text_0 = FALSE;
 
-    if (*button_label == 'C')
+    if (button_label == "C")
     {
         gtk_label_set_text(display, "0");
         nums[0] = 0;
@@ -194,18 +209,35 @@ static void on_button_clicked(GtkWidget *widget, gpointer data)
         *str_index = 0;
         return;
     }
+    else if (button_label == "CE")
+    {
+        int last_index = strlen(current_text);
+        if (isdigit(current_text[last_index - 1]))
+        {
+            slice_string(current_text, 0, *str_index, display_text);
+        }
+        else
+        {
+            slice_string(current_text, 0, *str_index - 1, display_text);
+            *str_index = strlen(display_text) - countDigits(nums[*nums_index - 1]);
+            *nums_index -= 1;
+            nums[*nums_index] = 0;
+        }
+        gtk_label_set_text(display, display_text);
+        return;
+    }
     else if (strcmp(current_text, "Error") == 0)
     {
         return;
     }
-    else if (*button_label == '*' || *button_label == '/' || *button_label == '+' || *button_label == '-')
+    else if (button_label == "*" || button_label == "/" || button_label == "+" || button_label == "-")
     {
         if (save_new_number(current_text, str_index, nums, nums_index) == ERROR_INVALID_INPUT)
         {
             return;
         }
     }
-    else if (*button_label == '=')
+    else if (button_label == "=")
     {
         process_equation(current_text, str_index, nums, nums_index, display);
         return;
@@ -300,6 +332,9 @@ activate(GtkApplication *app,
 
     GtkWidget *clear_button = create_button("C", GTK_LABEL(display), nums, nums_index, str_index);
     gtk_grid_attach(GTK_GRID(grid), clear_button, 0, 1, 1, 1);
+
+    GtkWidget *clear_one_button = create_button("CE", GTK_LABEL(display), nums, nums_index, str_index);
+    gtk_grid_attach(GTK_GRID(grid), clear_one_button, 3, 1, 1, 1);
 
     for (int i = 0; i < 16; i++)
     {
