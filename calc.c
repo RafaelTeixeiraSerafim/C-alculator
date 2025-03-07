@@ -322,6 +322,7 @@ activate(GtkApplication *app,
 {
     GtkWidget *window, *grid, *display;
     GtkCssProvider *css_provider;
+    GdkDisplay *css_display;
 
     window = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(window), "Calculadora");
@@ -333,6 +334,7 @@ activate(GtkApplication *app,
     display = gtk_label_new("0");
     gtk_label_set_xalign(GTK_LABEL(display), 1);
     gtk_grid_attach(GTK_GRID(grid), display, 0, 0, 4, 1);
+    gtk_widget_add_css_class(display, "display");
 
     char *buttons[] = {"7", "8", "9", "/", "4", "5", "6", "*", "1", "2", "3", "-", ".", "0", "=", "+"};
     double *nums = g_new(double, 100);
@@ -356,11 +358,10 @@ activate(GtkApplication *app,
         gtk_grid_attach(GTK_GRID(grid), button, i % 4, (i + 8) / 4, 1, 1);
     }
 
-    // css_provider = gtk_css_provider_new();
-    // gtk_css_provider_load_from_file(css_provider, g_file_new_for_path("style.css"));
-    // display = gdk_display_get_default();
-    // screen = gdk_display_get_default_screen(display);
-    // gtk_style_context_add_provider_for_screen(screen, GTK_STYLE_PROVIDER(css_provider), GTK_STYLE_PROVIDER_PRIORITY_USER);
+    css_provider = gtk_css_provider_new();
+    gtk_css_provider_load_from_file(css_provider, g_file_new_for_path("style.css"));
+    css_display = gdk_display_get_default();
+    gtk_style_context_add_provider_for_display(css_display, GTK_STYLE_PROVIDER(css_provider), GTK_STYLE_PROVIDER_PRIORITY_USER);
 
     DynamicData data_pointers = {nums, nums_index, str_index, has_decimal_point};
     g_signal_connect(window, "destroy", G_CALLBACK(on_window_destroy), &data_pointers);
